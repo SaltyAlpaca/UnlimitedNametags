@@ -382,8 +382,10 @@ public class PacketNameTag {
 
     public Location getOffsetLocation() {
         final Location location = owner.getLocation().clone();
-        location.setPitch(0);
-        location.setYaw(-180);
+        // Orient the display so the entity indicator arrow points upwards
+        // instead of sideways; yaw is irrelevant when pitch looks straight up.
+        location.setPitch(-90);
+        location.setYaw(0);
         location.setY(location.getY() + (1.8) * scale );
         return location;
     }

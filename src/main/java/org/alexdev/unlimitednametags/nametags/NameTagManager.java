@@ -97,33 +97,43 @@ public class NameTagManager {
 
         if (plugin.getConfigManager().getSettings().isShowWhileLooking()) {
             final MyScheduledTask point = plugin.getTaskScheduler().runTaskTimerAsynchronously(() ->
-                            Bukkit.getOnlinePlayers().forEach(player1 -> {
-                                final Optional<PacketNameTag> display = getPacketDisplayText(player1);
-                                if (display.isEmpty()) {
-                                    return;
+                    Bukkit.getOnlinePlayers().forEach(player1 -> {
+                        final Optional<PacketNameTag> display = getPacketDisplayText(player1);
+                        if (display.isEmpty()) {
+                            return;
+                        }
+
+                        Bukkit.getOnlinePlayers().forEach(player2 -> {
+                            if (plugin.getHook(ViaVersionHook.class).map(h -> h.hasNotTextDisplays(player2)).orElse(false)) {
+                                return;
+                            }
+
+                            if (player1.getWorld() != player2.getWorld()) {
+                                return;
+                            }
+
+                            if (player1.equals(player2)) {
+                                return;
+                            }
+
+                            // Distance culling to reduce per-tick pair checks for far players.
+                            // Skip pairs beyond 64 blocks and hide if currently visible.
+                            double distSq = player1.getLocation().distanceSquared(player2.getLocation());
+                            if (distSq > 64 * 64) {
+                                if (display.get().canPlayerSee(player2)) {
+                                    display.get().hideFromPlayer(player2);
                                 }
-                                Bukkit.getOnlinePlayers().forEach(player2 -> {
-                                    if (plugin.getHook(ViaVersionHook.class).map(h -> h.hasNotTextDisplays(player2)).orElse(false)) {
-                                        return;
-                                    }
+                                return;
+                            }
 
-                                    if (player1.getWorld() != player2.getWorld()) {
-                                        return;
-                                    }
-
-                                    if (player1.equals(player2)) {
-                                        return;
-                                    }
-
-                                    final boolean isPointing = isPlayerPointingAt(player2, player1);
-                                    if (display.get().canPlayerSee(player2) && !isPointing) {
-                                        display.get().hideFromPlayer(player2);
-                                    } else if (!display.get().canPlayerSee(player2) && isPointing) {
-                                        display.get().showToPlayer(player2);
-                                    }
-                                });
-                            })
-
+                            final boolean isPointing = isPlayerPointingAt(player2, player1);
+                            if (display.get().canPlayerSee(player2) && !isPointing) {
+                                display.get().hideFromPlayer(player2);
+                            } else if (!display.get().canPlayerSee(player2) && isPointing) {
+                                display.get().showToPlayer(player2);
+                            }
+                        });
+                    })
                     , 5, 5);
             tasks.add(point);
         }

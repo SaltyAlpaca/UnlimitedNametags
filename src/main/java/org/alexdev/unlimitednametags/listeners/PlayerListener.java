@@ -221,7 +221,29 @@ public class PlayerListener implements PackSendHandler {
         plugin.getNametagManager().getPacketDisplayText(player).ifPresent(packetDisplayText -> {
             packetDisplayText.hideForOwner();
 
-            plugin.getTaskScheduler().runTaskLaterAsynchronously(packetDisplayText::showForOwner, 5);
+            final long start = System.currentTimeMillis();
+            // Re-show only when player is stably not gliding anymore (e.g., back on ground),
+            // to avoid briefly rendering the nametag in the player's view while falling.
+            final com.github.Anon8281.universalScheduler.scheduling.tasks.MyScheduledTask[] taskRef = new com.github.Anon8281.universalScheduler.scheduling.tasks.MyScheduledTask[1];
+            taskRef[0] = plugin.getTaskScheduler().runTaskTimerAsynchronously(() -> {
+                if (!player.isOnline()) {
+                    taskRef[0].cancel();
+                    return;
+                }
+
+                // If still gliding, keep hidden.
+                if (player.isGliding()) {
+                    return;
+                }
+
+                // If on ground or after a short safety timeout, re-show.
+                boolean onGround = player.isOnGround();
+                boolean timeout = (System.currentTimeMillis() - start) > 2500; // ~50 ticks buffer
+                if (onGround || timeout) {
+                    packetDisplayText.showForOwner();
+                    taskRef[0].cancel();
+                }
+            }, 5, 5);
         });
     }
 
