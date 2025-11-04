@@ -219,6 +219,11 @@ public class PlayerListener implements PackSendHandler {
         }
 
         plugin.getNametagManager().getPacketDisplayText(player).ifPresent(packetDisplayText -> {
+            // Check if nametag is already hidden - if so, don't start another timer
+            if (!packetDisplayText.canPlayerSee(player)) {
+                return;
+            }
+
             packetDisplayText.hideForOwner();
 
             final long start = System.currentTimeMillis();
