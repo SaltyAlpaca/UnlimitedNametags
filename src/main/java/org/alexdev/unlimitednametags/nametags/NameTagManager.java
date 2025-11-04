@@ -39,6 +39,7 @@ public class NameTagManager {
     private final Set<UUID> creating;
     private final Set<UUID> blocked;
     private final Set<UUID> hideNametags;
+    private final Set<UUID> elytraGliding;
     private final List<MyScheduledTask> tasks;
     @Setter
     private boolean debug = false;
@@ -52,6 +53,7 @@ public class NameTagManager {
         this.creating = Sets.newConcurrentHashSet();
         this.blocked = Sets.newConcurrentHashSet();
         this.hideNametags = Sets.newConcurrentHashSet();
+        this.elytraGliding = Sets.newConcurrentHashSet();
         this.loadAll();
         this.scaleAttribute = loadScaleAttribute();
     }
@@ -136,6 +138,34 @@ public class NameTagManager {
                     })
                     , 5, 5);
             tasks.add(point);
+        }
+
+        // Elytra gliding check task - runs frequently to hide nametag proactively
+        if (plugin.getConfigManager().getSettings().isShowCurrentNameTag()) {
+            final MyScheduledTask elytraCheck = plugin.getTaskScheduler().runTaskTimerAsynchronously(() ->
+                    Bukkit.getOnlinePlayers().forEach(player -> {
+                        if (!player.isGliding()) {
+                            // Player stopped gliding, remove from tracking set
+                            if (elytraGliding.remove(player.getUniqueId())) {
+                                // Player was gliding but stopped - the logicElytra timer will handle re-showing
+                            }
+                            return;
+                        }
+
+                        // Player is gliding - check if we need to hide the nametag
+                        if (!elytraGliding.contains(player.getUniqueId())) {
+                            // First time detecting gliding for this session
+                            elytraGliding.add(player.getUniqueId());
+                            getPacketDisplayText(player).ifPresent(display -> {
+                                if (display.canPlayerSee(player)) {
+                                    // Hide nametag immediately and start re-show logic
+                                    plugin.getPlayerListener().logicElytra(player);
+                                }
+                            });
+                        }
+                    })
+                    , 1, 2); // Run every 2 ticks (0.1 seconds) for fast detection
+            tasks.add(elytraCheck);
         }
 
         tasks.add(refresh);
@@ -447,6 +477,8 @@ public class NameTagManager {
             entityIdToDisplay.remove(packetNameTag.getEntityId());
         }
 
+        // Clean up elytra gliding tracking
+        elytraGliding.remove(player.getUniqueId());
 
         nameTags.forEach((uuid, display) -> {
             display.handleQuit(player);
